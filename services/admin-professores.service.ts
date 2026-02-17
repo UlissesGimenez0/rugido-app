@@ -21,17 +21,21 @@ export async function getProfessores() {
   return data ?? [];
 }
 
+// services/admin-professores.service.ts
 
-export async function deleteProfessor(userId: string) {
+export async function deleteProfessor(id: string) {
+  console.log("DELETE CHAMADO:", id);
+
   const { data, error } = await supabase.functions.invoke(
     "delete-user",
     {
-      body: { user_id: userId },
+      body: { userId: id }, // <-- Alterado de user_id para userId
     }
   );
 
+  console.log("DELETE RESPONSE:", data, error);
+
   if (error) {
-    console.error("Erro ao deletar professor:", error);
     throw error;
   }
 

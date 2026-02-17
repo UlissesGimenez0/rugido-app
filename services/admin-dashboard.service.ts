@@ -1,31 +1,16 @@
 import { supabase } from "./supabase";
 
-export async function getAdminStats(academyId: string) {
-  const { data: professors } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("academy_id", academyId)
-    .eq("role", "professor");
+export async function getAdminStats() {
+  const { data, error } = await supabase.functions.invoke("dashboard-stats");
 
-  const { data: students } = await supabase
-    .from("profiles")
-    .select("id, professor_id")
-    .eq("academy_id", academyId)
-    .eq("role", "student");
+  if (error) {
+    console.error("Erro ao buscar stats do dashboard:", error);
+    return null;
+  }
 
-  const totalProfessors = professors?.length || 0;
-  const totalStudents = students?.length || 0;
+  if (typeof data === "string") {
+    return JSON.parse(data);
+  }
 
-  const withPersonal =
-    students?.filter((s) => s.professor_id !== null).length || 0;
-
-  const withoutPersonal =
-    students?.filter((s) => s.professor_id === null).length || 0;
-
-  return {
-    totalProfessors,
-    totalStudents,
-    withPersonal,
-    withoutPersonal,
-  };
+  return data;
 }

@@ -32,3 +32,18 @@ export async function createUser({
 
   return data;
 }
+
+export async function deleteUser(userId: string) {
+  const { data, error } = await supabase.functions.invoke(
+    "delete-user",
+    {
+      body: { userId },
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
