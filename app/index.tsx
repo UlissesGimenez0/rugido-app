@@ -23,6 +23,7 @@ export default function Index() {
           return;
         }
 
+        
         console.log("✅ Sessão válida");
 
         console.log("🔎 Buscando profile...");

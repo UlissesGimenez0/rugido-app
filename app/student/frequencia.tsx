@@ -1,3 +1,4 @@
+import { Card } from "@/components/Card";
 import { Screen } from "@/components/Screen";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/store/auth.store";
@@ -9,28 +10,20 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 export default function Frequencia() {
   const router = useRouter();
   const today = new Date();
-
   const user = useAuthStore((state) => state.user);
 
   const [attendanceDays, setAttendanceDays] = useState<number[]>([]);
   const [totalMonth, setTotalMonth] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
-
   const [streak, setStreak] = useState(0);
 
   const currentMonth = selectedDate.getMonth();
   const currentYear = selectedDate.getFullYear();
 
-  const isCurrentMonth =
-    currentMonth === today.getMonth() && currentYear === today.getFullYear();
+  const isCurrentMonth = currentMonth === today.getMonth() && currentYear === today.getFullYear();
 
-  const goToPreviousMonth = () => {
-    setSelectedDate(new Date(currentYear, currentMonth - 1, 1));
-  };
-
-  const goToNextMonth = () => {
-    setSelectedDate(new Date(currentYear, currentMonth + 1, 1));
-  };
+  const goToPreviousMonth = () => setSelectedDate(new Date(currentYear, currentMonth - 1, 1));
+  const goToNextMonth = () => setSelectedDate(new Date(currentYear, currentMonth + 1, 1));
 
   useEffect(() => {
     if (!user) return;
@@ -47,11 +40,16 @@ export default function Frequencia() {
         .lte("date", endOfMonth.toISOString().split("T")[0]);
 
       if (data) {
-        const days = data.map((item) => new Date(item.date).getDate());
-
+        // Resolve a diferença de fuso horário ao extrair o dia
+        const days = data.map((item) => {
+          const d = new Date(item.date);
+          d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+          return d.getDate();
+        });
         setAttendanceDays(days);
         setTotalMonth(days.length);
       }
+
       const { data: allAttendance } = await supabase
         .from("attendance")
         .select("date")
@@ -78,28 +76,26 @@ export default function Frequencia() {
       setStreak(0);
       return;
     }
-
     const dates = data.map((item) => new Date(item.date));
-
     let currentStreak = 0;
-    let yesterday = new Date();
-    yesterday.setHours(0, 0, 0, 0);
+    let referenceDate = new Date();
+    referenceDate.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < dates.length; i++) {
       const checkDate = new Date(dates[i]);
+      // Ajuste de fuso horário
+      checkDate.setMinutes(checkDate.getMinutes() + checkDate.getTimezoneOffset());
       checkDate.setHours(0, 0, 0, 0);
 
-      const diff =
-        (yesterday.getTime() - checkDate.getTime()) / (1000 * 60 * 60 * 24);
+      const diff = (referenceDate.getTime() - checkDate.getTime()) / (1000 * 60 * 60 * 24);
 
       if (diff === 0 || diff === 1) {
         currentStreak++;
-        yesterday = checkDate;
-      } else {
+        referenceDate = checkDate; // Atualiza a referência para o dia anterior
+      } else if (diff > 1) {
         break;
       }
     }
-
     setStreak(currentStreak);
   };
 
@@ -107,186 +103,140 @@ export default function Frequencia() {
     <Screen>
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 15 }}>
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-
         <Text style={styles.headerTitle}>Frequência</Text>
       </View>
 
-      <Text style={styles.summary}>
-        Você treinou {totalMonth} dias este mês
-      </Text>
+      {/* DASHBOARD DE ESTATÍSTICAS (NOVO DESIGN LADO A LADO) */}
+      <View style={styles.statsRow}>
+        <Card style={styles.statCard}>
+          <View style={[styles.statIconBox, { backgroundColor: "rgba(0, 122, 255, 0.15)" }]}>
+            <Feather name="calendar" size={20} color="#007AFF" />
+          </View>
+          <Text style={styles.statValue}>{totalMonth}</Text>
+          <Text style={styles.statLabel}>Treinos no Mês</Text>
+        </Card>
 
-      <View style={styles.streakContainer}>
-        <Text style={styles.streakNumber}>🔥 {streak}</Text>
-        <Text style={styles.streakText}>Dias consecutivos</Text>
+        <Card style={styles.statCard}>
+          <View style={[styles.statIconBox, { backgroundColor: "rgba(255, 0, 94, 0.15)" }]}>
+            <Feather name="zap" size={20} color="#FF005E" />
+          </View>
+          <Text style={styles.statValue}>{streak} <Text style={{ fontSize: 16 }}>🔥</Text></Text>
+          <Text style={styles.statLabel}>Sequência Atual</Text>
+        </Card>
       </View>
 
-      <View style={styles.centerContainer}>
-        <View style={styles.calendarCard}>
-          {/* RESUMO */}
+      {/* CALENDÁRIO */}
+      <Card style={styles.calendarContainer}>
+        
+        {/* NAVEGAÇÃO DO MÊS */}
+        <View style={styles.monthHeader}>
+          <TouchableOpacity onPress={goToPreviousMonth} style={styles.monthButton}>
+            <Feather name="chevron-left" size={24} color="#fff" />
+          </TouchableOpacity>
 
-          {/* MÊS COM SETAS */}
-          <View style={styles.monthHeader}>
-            <TouchableOpacity onPress={goToPreviousMonth}>
-              <Feather name="chevron-left" size={28} color="#fff" />
-            </TouchableOpacity>
+          <Text style={styles.monthTitle}>
+            {formattedMonth} {currentYear}
+          </Text>
 
-            <Text style={styles.monthTitle}>
-              {formattedMonth} {currentYear}
-            </Text>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            disabled={isCurrentMonth}
+            style={[styles.monthButton, isCurrentMonth && { opacity: 0.2 }]}
+          >
+            <Feather name="chevron-right" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-            <TouchableOpacity
-              onPress={goToNextMonth}
-              disabled={isCurrentMonth}
-              style={{ opacity: isCurrentMonth ? 0.3 : 1 }}
-            >
-              <Feather name="chevron-right" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        {/* DIAS DA SEMANA */}
+        <View style={styles.weekHeader}>
+          {["D", "S", "T", "Q", "Q", "S", "S"].map((day, i) => (
+            <Text key={i} style={styles.weekDay}>{day}</Text>
+          ))}
+        </View>
 
-          {/* DIAS DA SEMANA */}
-          <View style={styles.weekHeader}>
-            {["D", "S", "T", "Q", "Q", "S", "S"].map((day) => (
-              <Text key={day} style={styles.weekDay}>
-                {day}
-              </Text>
-            ))}
-          </View>
+        {/* GRELHA DOS DIAS */}
+        <View style={styles.calendarGrid}>
+          {/* Espaços Vazios antes do dia 1 */}
+          {Array.from({ length: firstDayOfMonth }).map((_, index) => (
+            <View key={`empty-${index}`} style={styles.dayCellWrapper} />
+          ))}
 
-          {/* CALENDÁRIO */}
-          <View style={styles.calendar}>
-            {Array.from({ length: firstDayOfMonth }).map((_, index) => (
-              <View key={`empty-${index}`} style={styles.dayCell} />
-            ))}
+          {/* Dias do Mês */}
+          {Array.from({ length: daysInMonth }, (_, index) => {
+            const dayNumber = index + 1;
+            const isCompleted = attendanceDays.includes(dayNumber);
+            const isToday = dayNumber === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+            const isFuture = !isCurrentMonth ? false : dayNumber > today.getDate();
 
-            {Array.from({ length: daysInMonth }, (_, index) => {
-              const dayNumber = index + 1;
-              const isCompleted = attendanceDays.includes(dayNumber);
-              const isToday =
-                dayNumber === today.getDate() &&
-                currentMonth === today.getMonth() &&
-                currentYear === today.getFullYear();
-
-              return (
+            return (
+              <View key={dayNumber} style={styles.dayCellWrapper}>
                 <View
-                  key={dayNumber}
                   style={[
                     styles.dayCell,
                     isCompleted && styles.completedDay,
-                    isToday && styles.todayDay,
+                    isToday && !isCompleted && styles.todayDay,
+                    isFuture && { opacity: 0.3 }
                   ]}
                 >
-                  <Text style={styles.dayText}>{dayNumber}</Text>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      isCompleted && styles.completedDayText,
+                      isToday && !isCompleted && styles.todayDayText,
+                    ]}
+                  >
+                    {dayNumber}
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
+              </View>
+            );
+          })}
         </View>
-      </View>
+      </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
+  header: { flexDirection: "row", alignItems: "center", marginBottom: 25, marginTop: 10 },
+  headerTitle: { color: "#fff", fontSize: 26, fontWeight: "800" },
+
+  // ESTATÍSTICAS NO TOPO
+  statsRow: { flexDirection: "row", gap: 15, marginBottom: 25 },
+  statCard: { flex: 1, padding: 18, borderRadius: 24, alignItems: "center" },
+  statIconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", marginBottom: 12 },
+  statValue: { color: "#fff", fontSize: 28, fontWeight: "800", marginBottom: 4 },
+  statLabel: { color: "#888", fontSize: 13, fontWeight: "600", textAlign: "center" },
+
+  // CALENDÁRIO
+  calendarContainer: { padding: 20, borderRadius: 28 },
+  monthHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 25 },
+  monthTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  monthButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" },
+  
+  weekHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 15 },
+  weekDay: { width: "14.28%", textAlign: "center", color: "#666", fontWeight: "700", fontSize: 13 },
+  
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap" },
+  dayCellWrapper: { width: "14.28%", aspectRatio: 1, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  
+  dayCell: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    justifyContent: "center", 
     alignItems: "center",
-    marginBottom: 20,
+    backgroundColor: "transparent" // Fundo padrão
   },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-    marginLeft: 15,
-  },
-  summary: {
-    color: "#FF005E",
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  monthHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  monthTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  weekHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  weekDay: {
-    width: "14.28%",
-    textAlign: "center",
-    color: "#aaa",
-    fontWeight: "600",
-  },
-  calendar: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  dayCell: {
-    width: "14.28%",
-    aspectRatio: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
+  dayText: { color: "#aaa", fontSize: 15, fontWeight: "500" },
 
-  completedDay: {
-    backgroundColor: "#00E676",
-    borderRadius: 12,
-  },
+  // ESTADOS DOS DIAS
+  completedDay: { backgroundColor: "#00E676", shadowColor: "#00E676", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
+  completedDayText: { color: "#111", fontWeight: "800" },
 
-  todayDay: {
-    borderWidth: 2,
-    borderColor: "#FF005E",
-    borderRadius: 12,
-  },
-
-  dayText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-  },
-
-  calendarCard: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 24,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-
-    elevation: 8, // Android
-  },
-  streakContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  streakNumber: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#FF005E",
-  },
-
-  streakText: {
-    color: "#aaa",
-    fontSize: 14,
-  },
+  todayDay: { borderWidth: 2, borderColor: "#FF005E" },
+  todayDayText: { color: "#FF005E", fontWeight: "800" },
 });
