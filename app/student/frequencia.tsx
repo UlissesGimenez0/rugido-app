@@ -29,32 +29,39 @@ export default function Frequencia() {
     if (!user) return;
 
     const fetchAttendance = async () => {
+      // Começo e fim do mês selecionado
       const startOfMonth = new Date(currentYear, currentMonth, 1);
       const endOfMonth = new Date(currentYear, currentMonth + 1, 0);
 
+      // 1. Vai buscar as presenças do mês atual usando 'checkin_date'
       const { data } = await supabase
         .from("attendance")
-        .select("date")
+        .select("checkin_date") // <--- AQUI ESTAVA O ERRO (estava "date")
         .eq("user_id", user.id)
-        .gte("date", startOfMonth.toISOString().split("T")[0])
-        .lte("date", endOfMonth.toISOString().split("T")[0]);
+        .gte("checkin_date", startOfMonth.toISOString().split("T")[0])
+        .lte("checkin_date", endOfMonth.toISOString().split("T")[0]);
 
       if (data) {
-        // Resolve a diferença de fuso horário ao extrair o dia
+        // Formata os dias para as bolinhas do calendário
         const days = data.map((item) => {
-          const d = new Date(item.date);
+          const d = new Date(item.checkin_date);
           d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
           return d.getDate();
         });
-        setAttendanceDays(days);
-        setTotalMonth(days.length);
+        
+        // Remove duplicados (caso ele tenha carregado em finalizar 2x no mesmo dia)
+        const uniqueDays = [...new Set(days)];
+        
+        setAttendanceDays(uniqueDays);
+        setTotalMonth(uniqueDays.length);
       }
 
+      // 2. Vai buscar TUDO para calcular a sequência (Streak)
       const { data: allAttendance } = await supabase
         .from("attendance")
-        .select("date")
+        .select("checkin_date") // <--- AQUI TAMBÉM ESTAVA "date"
         .eq("user_id", user.id)
-        .order("date", { ascending: false });
+        .order("checkin_date", { ascending: false });
 
       if (allAttendance) {
         calculateStreak(allAttendance);
@@ -67,23 +74,28 @@ export default function Frequencia() {
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
+  // Nome do mês em português
   const formattedMonth = selectedDate
     .toLocaleString("pt-BR", { month: "long" })
     .replace(/^\w/, (c) => c.toUpperCase());
 
+  // Função para calcular dias seguidos a treinar
   const calculateStreak = (data: any[]) => {
     if (!data.length) {
       setStreak(0);
       return;
     }
-    const dates = data.map((item) => new Date(item.date));
+
+    // Usar Set para garantir que não contamos o mesmo dia duas vezes
+    const uniqueDatesRaw = [...new Set(data.map(item => item.checkin_date))];
+    const dates = uniqueDatesRaw.map((dateString) => new Date(dateString as string));
+    
     let currentStreak = 0;
     let referenceDate = new Date();
     referenceDate.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < dates.length; i++) {
       const checkDate = new Date(dates[i]);
-      // Ajuste de fuso horário
       checkDate.setMinutes(checkDate.getMinutes() + checkDate.getTimezoneOffset());
       checkDate.setHours(0, 0, 0, 0);
 
@@ -91,9 +103,9 @@ export default function Frequencia() {
 
       if (diff === 0 || diff === 1) {
         currentStreak++;
-        referenceDate = checkDate; // Atualiza a referência para o dia anterior
+        referenceDate = checkDate; // Atualiza a referência
       } else if (diff > 1) {
-        break;
+        break; // Quebrou a sequência
       }
     }
     setStreak(currentStreak);
@@ -106,10 +118,10 @@ export default function Frequencia() {
         <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 15 }}>
           <Feather name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Frequência</Text>
+        <Text style={styles.headerTitle}>Minha Frequência</Text>
       </View>
 
-      {/* DASHBOARD DE ESTATÍSTICAS (NOVO DESIGN LADO A LADO) */}
+      {/* DASHBOARD DE ESTATÍSTICAS */}
       <View style={styles.statsRow}>
         <Card style={styles.statCard}>
           <View style={[styles.statIconBox, { backgroundColor: "rgba(0, 122, 255, 0.15)" }]}>
@@ -204,14 +216,12 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", marginBottom: 25, marginTop: 10 },
   headerTitle: { color: "#fff", fontSize: 26, fontWeight: "800" },
 
-  // ESTATÍSTICAS NO TOPO
   statsRow: { flexDirection: "row", gap: 15, marginBottom: 25 },
   statCard: { flex: 1, padding: 18, borderRadius: 24, alignItems: "center" },
   statIconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", marginBottom: 12 },
   statValue: { color: "#fff", fontSize: 28, fontWeight: "800", marginBottom: 4 },
   statLabel: { color: "#888", fontSize: 13, fontWeight: "600", textAlign: "center" },
 
-  // CALENDÁRIO
   calendarContainer: { padding: 20, borderRadius: 28 },
   monthHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 25 },
   monthTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
@@ -229,11 +239,10 @@ const styles = StyleSheet.create({
     borderRadius: 18, 
     justifyContent: "center", 
     alignItems: "center",
-    backgroundColor: "transparent" // Fundo padrão
+    backgroundColor: "transparent"
   },
   dayText: { color: "#aaa", fontSize: 15, fontWeight: "500" },
 
-  // ESTADOS DOS DIAS
   completedDay: { backgroundColor: "#00E676", shadowColor: "#00E676", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
   completedDayText: { color: "#111", fontWeight: "800" },
 

@@ -104,20 +104,16 @@ export default function Home() {
       <Text style={[styles.sectionTitle, { marginTop: 35 }]}>Acesso rápido</Text>
 
       <View style={styles.grid}>
-       {/* BOTÃO FINANCEIRO DO ALUNO */}
-            <TouchableOpacity 
-              style={styles.gridItemFull} 
-              onPress={() => router.push("/student/financeiro")}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: "rgba(255, 193, 7, 0.15)" }]}>
-                <Feather name="dollar-sign" size={24} color="#FFC107" />
-              </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={styles.actionTitle}>Financeiro</Text>
-                <Text style={styles.actionSubtitle}>As minhas mensalidades</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color="#555" />
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.gridItem}
+          onPress={() => router.push("/student/financeiro")}
+        >
+          <Card style={styles.squareCard}>
+            <Feather name="dollar-sign" size={28} color="#00E676" />
+            <Text style={styles.cardTitle}>Financeiro</Text>
+          </Card>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.gridItem}
           onPress={() => router.push("/student/treino")}
@@ -198,9 +194,4 @@ const styles = StyleSheet.create({
   iconCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(0, 122, 255, 0.15)", justifyContent: "center", alignItems: "center" },
   cardTitleRow: { color: "#fff", fontSize: 16, fontWeight: "700" },
   cardSubRow: { color: "#aaa", fontSize: 13, marginTop: 2 },
-  iconContainer: { width: 48, height: 48, borderRadius: 16, justifyContent: "center", alignItems: "center" },
-  actionTextContainer: { flex: 1, marginLeft: 15 },
-  actionTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  actionSubtitle: { color: "#aaa", fontSize: 13, marginTop: 2 },
-  
 });

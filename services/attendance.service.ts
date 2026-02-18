@@ -24,3 +24,34 @@ export async function registrarCheckIn(userId: string, workoutId?: string) {
   if (error) throw error;
   return { message: "Check-in realizado!" };
 }
+// Busca todos os check-ins do dia de hoje
+export async function getPresencasHoje() {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data, error } = await supabase
+    .from("attendance")
+    .select(`
+      *,
+      profiles (name)
+    `)
+    .eq("checkin_date", today)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+// Busca o histórico geral agrupado por aluno (opcional para relatórios)
+export async function getResumoFrequencia() {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(`
+      id,
+      name,
+      attendance (checkin_date)
+    `)
+    .eq("role", "student");
+
+  if (error) throw error;
+  return data || [];
+}
