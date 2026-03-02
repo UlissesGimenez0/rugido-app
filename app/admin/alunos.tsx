@@ -111,10 +111,15 @@ export default function Alunos() {
         data={alunos}
         keyExtractor={(item, index) => (item?.id ? item.id : `aluno-${index}`)}
         contentContainerStyle={{ paddingBottom: 40 }}
-        renderItem={({ item }) => (
+ renderItem={({ item }) => (
           <Card style={styles.card}>
             <View style={styles.row}>
-              <View style={styles.infoContainer}>
+              
+              {/* ENVOLVEMOS A INFO NUM TOUCHABLE PARA ABRIR A FICHA DO ALUNO */}
+              <TouchableOpacity 
+                style={styles.infoContainer}
+                onPress={() => router.push(`/admin/aluno/${item.id}` as any)}
+              >
                 <View style={[styles.avatarPlaceholder, !item.professor_id && styles.avatarPlaceholderNoProf]}>
                   <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
                 </View>
@@ -124,7 +129,7 @@ export default function Alunos() {
                     {getProfessorName(item.professor_id)}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -137,6 +142,7 @@ export default function Alunos() {
                   <Text style={styles.deleteText}>Excluir</Text>
                 )}
               </TouchableOpacity>
+              
             </View>
           </Card>
         )}
