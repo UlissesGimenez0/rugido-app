@@ -1,50 +1,67 @@
-# Welcome to your Expo app 👋
+# 🦁 Rugido App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Expo](https://img.shields.io/badge/Expo-1B1F23?style=for-the-badge&logo=expo&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
 
-## Get started
+## 📖 Introdução ao Projeto
 
-1. Install dependencies
+Gerir um ginásio, estúdio de treino ou dojo não precisa de ser uma dor de cabeça. O **Rugido App** nasceu para simplificar a vida de quem ensina, de quem treina e de quem administra. 
 
-   ```bash
-   npm install
-   ```
+Trata-se de uma aplicação móvel completa e centralizada que conecta a gestão financeira, a prescrição de treinos e o acompanhamento de alunos num só lugar, com uma interface ágil e intuitiva.
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## ✨ Funcionalidades e Perfis de Acesso
 
-In the output, you'll find options to open the app in a
+A aplicação possui um sistema inteligente de controlo de acessos (Role-Based Access Control). O sistema reconhece quem faz o login e adapta toda a experiência através de **3 perfis principais**:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 👑 Administração (`/admin`)
+O centro de comando do espaço:
+- **Controlo Total:** Cadastro e gestão de alunos e professores.
+- **Saúde Financeira:** Acompanhamento de pagamentos, mensalidades e assinaturas ativas.
+- **Biblioteca Base:** Criação e organização da base de dados global de exercícios.
+- **Métricas:** Controlo de frequência (check-ins) para saber quem está a treinar.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 🏋️ Professores (`/teacher`)
+Foco total no treino e nos alunos:
+- **Acompanhamento:** Visão detalhada do progresso dos alunos atribuídos a si.
+- **Prescrição Ágil:** Montagem de planos de treino personalizados utilizando a biblioteca de exercícios da plataforma.
 
-## Get a fresh project
+### 🏃‍♂️ Alunos (`/student`)
+O companheiro de treino digital:
+- **Treino do Dia:** O aluno abre a app e sabe exatamente qual é o seu treino de hoje, sem papéis.
+- **Frequência:** Histórico de check-ins para acompanhar a própria consistência.
+- **Transparência:** Consulta rápida do estado da sua mensalidade (paga/pendente).
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
-```
+## 🚀 O Motor da App (Tecnologias)
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Este projeto foi construído com as melhores e mais modernas ferramentas do ecossistema mobile:
 
-## Learn more
+- **Frontend Mobile:** [React Native](https://reactnative.dev/) com o ecossistema [Expo](https://expo.dev/).
+- **Navegação:** [Expo Router](https://docs.expo.dev/router/introduction/) (arquitetura baseada em ficheiros, facilitando a separação das rotas por perfil).
+- **Linguagem:** [TypeScript](https://www.typescriptlang.org/) garantindo tipagem segura e menos *bugs*.
+- **Backend & Base de Dados:** [Supabase](https://supabase.com/) como BaaS para autenticação segura e persistência de dados.
+- **Gestão de Estado:** Solução customizada (`/store/auth.store.ts`) para manter a sessão do utilizador fluida.
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 📁 Estrutura do Código
 
-## Join the community
+A nossa organização de pastas foi pensada para ser escalável e fácil de entender:
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+rugido-app/
+├── app/               # O coração da navegação (Expo Router)
+│   ├── admin/         # 👑 Ecrãs e rotas da Administração
+│   ├── teacher/       # 🏋️ Ecrãs e rotas dos Professores
+│   ├── student/       # 🏃‍♂️ Ecrãs e rotas dos Alunos
+│   └── auth/          # 🔐 Ecrãs de Login e Autenticação
+├── components/        # Componentes visuais reutilizáveis (UI)
+├── constants/         # Identidade visual (Cores, Temas) e constantes
+├── hooks/             # Lógica partilhada (Custom hooks)
+├── services/          # Comunicação com o backend (Supabase API)
+└── store/             # Gestão do estado global
