@@ -20,7 +20,7 @@ export default function FinanceiroAluno() {
   const [selectedAmount, setSelectedAmount] = useState("");
 
   // --- COLOQUE AQUI OS DADOS REAIS DA SUA ACADEMIA ---
-  const PIX_KEY = "12.345.678/0001-90"; // Sua chave PIX (CNPJ, Email, Telemóvel)
+  const PIX_KEY = "59.858.158/0001-40"; // Sua chave PIX (CNPJ, Email, Telemóvel)
   const PIX_NAME = "Academia Rugido Oficial"; // Nome que aparece no banco
 
   useEffect(() => {

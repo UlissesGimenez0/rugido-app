@@ -9,10 +9,20 @@ export default function ProfessorDashboard() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
     const executeSignOut = async () => {
-      await supabase.auth.signOut();
-      router.replace("/auth/login");
+      try {
+        // 1. Apaga a memória do utilizador imediatamente (mesmo antes da internet responder)
+        useAuthStore.getState().setUser(null); 
+        
+        // 2. Tenta desligar do Supabase
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.log("Ignorando erro de logout:", error);
+      } finally {
+        // 3. O 'finally' garante que, com ou sem erro, ele é atirado para o login!
+        router.replace("/auth/login");
+      }
     };
 
     if (Platform.OS === 'web') {
@@ -27,7 +37,6 @@ export default function ProfessorDashboard() {
       { text: "Sair", style: "destructive", onPress: executeSignOut },
     ]);
   };
-
   return (
     <Screen>
       <View style={styles.container}>

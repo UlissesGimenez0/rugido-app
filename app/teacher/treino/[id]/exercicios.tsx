@@ -3,307 +3,390 @@ import { Screen } from "@/components/Screen";
 import { supabase } from "@/services/supabase";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-// --- COMPONENTE DO CARTÃO COM VÍDEO (Roda em loop infinito sem som) ---
-const ExerciseCard = ({ item, index, onDelete }: any) => {
-  // Configura o player do vídeo se existir uma URL
-  const player = useVideoPlayer(item.video_url, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-
-  return (
-    <Card style={styles.card}>
-      <View style={styles.row}>
-        {/* Mostra o vídeo se existir, senão mostra o número */}
-        {item.video_url ? (
-          <VideoView player={player} style={styles.videoThumbnail} contentFit="cover" />
-        ) : (
-          <View style={styles.indexCircle}>
-            <Text style={styles.indexText}>{index + 1}</Text>
-          </View>
-        )}
-
-        <View style={{ flex: 1, marginLeft: 15 }}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.details}>
-            {item.sets} séries • {item.reps} reps {item.rest_seconds ? `• ${item.rest_seconds}s desc.` : ""}
-          </Text>
-        </View>
-        
-        <TouchableOpacity onPress={() => onDelete(item.id)} style={{ padding: 10 }}>
-          <Feather name="trash-2" size={20} color="#FF3B30" />
-        </TouchableOpacity>
-      </View>
-    </Card>
-  );
-};
-
-export default function ExerciciosDoTreino() {
+export default function AdminTreinoExercicios() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
 
-  const [exercicios, setExercicios] = useState<any[]>([]);
-  const [biblioteca, setBiblioteca] = useState<any[]>([]);
+  const [workout, setWorkout] = useState<any>(null);
+  const [currentExercises, setCurrentExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal
+  // Estados dos Modais
   const [modalVisible, setModalVisible] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   
-  // O formulário agora guarda a seleção do exercício da base
-  const [form, setForm] = useState({
-    name: "",
-    sets: "",
-    reps: "",
-    rest_seconds: "",
-    video_url: "",
-  });
+  // Busca e Seleção
+  const [searchQuery, setSearchQuery] = useState("");
+  const [libraryResults, setLibraryResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<any>(null); // Para novos
+  const [editingExercise, setEditingExercise] = useState<any>(null); // Para editar existentes
 
-  useEffect(() => {
-    if (id) {
-      loadExercicios();
-      loadBiblioteca();
-    }
-  }, [id]);
+  const [form, setForm] = useState({ sets: "3", reps: "10 a 12", rest_seconds: "60" });
+  const [saving, setSaving] = useState(false);
 
-  const loadExercicios = async () => {
+  useEffect(() => { loadWorkoutData(); }, [id]);
+
+  const loadWorkoutData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("exercises")
-        .select("*")
-        .eq("workout_id", id)
-        .order("created_at", { ascending: true });
+      const { data: wkData } = await supabase.from("workouts").select("*").eq("id", id).single();
+      if (wkData) setWorkout(wkData);
 
-      if (error) throw error;
-      setExercicios(data || []);
-    } catch (error) {
-      console.error("Erro ao carregar exercícios:", error);
+      const { data: exData } = await supabase.from("exercises").select("*").eq("workout_id", id).order("created_at", { ascending: true });
+      if (exData) setCurrentExercises(exData);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadBiblioteca = async () => {
-    const { data } = await supabase.from("exercise_library").select("*").order("name");
-    if (data) setBiblioteca(data);
+  const getGifUrl = (url?: string) => {
+    if (!url) return "";
+    const fileName = url.split("/").pop();
+    return `https://raw.githubusercontent.com/omercotkd/exercises-gifs/main/assets/${fileName}`;
   };
 
-  const handleSelectFromLibrary = (item: any) => {
-    setForm({ ...form, name: item.name, video_url: item.media_url });
-  };
-
-  const handleAddExercise = async () => {
-    if (!form.name.trim() || !form.sets || !form.reps) {
-      alert("Selecione um exercício e preencha as séries e repetições.");
-      return;
+  const handleSearch = async () => {
+    if (searchQuery.length < 2) return;
+    try {
+      setSearching(true);
+      const { data, error } = await supabase
+        .from("exercise_library")
+        .select("*")
+        .ilike("name", `%${searchQuery}%`)
+        .limit(20);
+      
+      if (error) throw error;
+      setLibraryResults(data || []);
+    } catch (error) {
+      console.error("Erro ao pesquisar:", error);
+    } finally {
+      setSearching(false);
     }
+  };
 
+  // --- FUNÇÃO PARA SALVAR NOVO ---
+  const handleAddExercise = async () => {
+    if (!selectedExercise) return;
     try {
       setSaving(true);
       const { error } = await supabase.from("exercises").insert({
         workout_id: id,
-        name: form.name,
-        sets: parseInt(form.sets),
-        reps: parseInt(form.reps),
-        rest_seconds: form.rest_seconds ? parseInt(form.rest_seconds) : null,
-        video_url: form.video_url || null,
+        name: selectedExercise.name,
+        video_url: selectedExercise.media_url,
+        sets: form.sets,
+        reps: form.reps,
+        rest_seconds: form.rest_seconds,
       });
-
       if (error) throw error;
 
+      Alert.alert("Sucesso", "Exercício adicionado à ficha!");
+      setSelectedExercise(null);
       setModalVisible(false);
-      setForm({ name: "", sets: "", reps: "", rest_seconds: "", video_url: "" });
-      loadExercicios();
+      setSearchQuery("");
+      setLibraryResults([]);
+      loadWorkoutData();
     } catch (error: any) {
-      alert("Erro ao salvar exercício: " + error.message);
+      Alert.alert("Erro", error.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (exerciseId: string) => {
-    Alert.alert("Excluir", "Remover este exercício do treino?", [
+  // --- FUNÇÃO PARA ATUALIZAR EXISTENTE ---
+  const handleUpdateExercise = async () => {
+    if (!editingExercise) return;
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from("exercises")
+        .update({
+          sets: form.sets,
+          reps: form.reps,
+          rest_seconds: form.rest_seconds
+        })
+        .eq("id", editingExercise.id);
+
+      if (error) throw error;
+      
+      Alert.alert("Sucesso", "Exercício atualizado!");
+      setEditModalVisible(false);
+      loadWorkoutData();
+    } catch (err: any) {
+        Alert.alert("Erro", err.message);
+    } finally {
+      setSaving(false);
+      setEditingExercise(null);
+    }
+  };
+
+  const handleDelete = async (exerciseId: string) => {
+    Alert.alert("Remover", "Deseja remover este exercício?", [
       { text: "Cancelar", style: "cancel" },
-      {
-        text: "Remover",
-        style: "destructive",
-        onPress: async () => {
+      { text: "Remover", style: "destructive", onPress: async () => {
           await supabase.from("exercises").delete().eq("id", exerciseId);
-          setExercicios((prev) => prev.filter((e) => e.id !== exerciseId));
-        },
-      },
+          loadWorkoutData();
+      }}
     ]);
   };
 
-  if (loading) {
-    return (
-      <Screen>
-        <ActivityIndicator color="#00E676" size="large" />
-      </Screen>
-    );
-  }
+  // Abre o modal de edição com os dados atuais
+  const openEditModal = (ex: any) => {
+    setEditingExercise(ex);
+    setForm({ sets: ex.sets, reps: ex.reps, rest_seconds: ex.rest_seconds });
+    setEditModalVisible(true);
+  };
+
+  if (loading) return <Screen><ActivityIndicator color="#00E676" size="large" style={{ marginTop: 50 }} /></Screen>;
 
   return (
     <Screen>
       <View style={styles.header}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 15 }}>
             <Feather name="arrow-left" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ficha de Treino</Text>
+          <View>
+            <Text style={styles.headerTitle}>Gerir Treino</Text>
+            <Text style={styles.headerSub}>{workout?.name}</Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
-          <Feather name="plus" size={24} color="#fff" />
+        <TouchableOpacity style={styles.addButton} onPress={() => { setForm({sets:"3", reps:"10 a 12", rest_seconds:"60"}); setModalVisible(true); }}>
+          <Feather name="plus" size={24} color="#111" />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={exercicios}
+        data={currentExercises}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 40 }}
-        renderItem={({ item, index }) => (
-          <ExerciseCard item={item} index={index} onDelete={handleDelete} />
-        )}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Feather name="list" size={48} color="#333" style={{ marginBottom: 15 }} />
-            <Text style={styles.empty}>Nenhum exercício neste treino.</Text>
-            <Text style={styles.emptySub}>Clique no + para adicionar da biblioteca.</Text>
+            <Feather name="clipboard" size={40} color="#333" />
+            <Text style={styles.emptyText}>Nenhum exercício nesta ficha.</Text>
+            <Text style={styles.emptySub}>Clique no "+" para adicionar.</Text>
           </View>
         }
+        renderItem={({ item }) => (
+          <Card style={styles.exerciseCard}>
+            <TouchableOpacity style={styles.cardRow} onPress={() => openEditModal(item)}>
+              <View style={styles.gifContainer}>
+                <Image source={{ uri: getGifUrl(item.video_url) }} style={styles.gif} resizeMode="cover" />
+              </View>
+              <View style={styles.cardInfo}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.cardDetails}>{item.sets} x {item.reps} • {item.rest_seconds}s</Text>
+              </View>
+              <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
+                <Feather name="trash-2" size={18} color="#FF005E" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Card>
+        )}
       />
 
-      {/* MODAL DE ADICIONAR EXERCÍCIO */}
-      <Modal visible={modalVisible} transparent animationType="slide">
+      {/* MODAL PARA EDITAR EXERCÍCIO EXISTENTE (SÉRIES/REPS) */}
+      <Modal visible={editModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Adicionar Exercício</Text>
+          <View style={[styles.modalContent, { height: '60%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar Execução</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}><Feather name="x" size={24} color="#666" /></TouchableOpacity>
+            </View>
+            
+            <Text style={styles.editExName}>{editingExercise?.name}</Text>
 
-            {/* SELEÇÃO DA BIBLIOTECA (Seus 5 vídeos aparecem aqui!) */}
-            <Text style={styles.label}>1. Escolha o Exercício:</Text>
-            <View style={{ height: 60, marginBottom: 20 }}>
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={biblioteca}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.libChip,
-                      form.name === item.name && styles.libChipActive,
-                    ]}
-                    onPress={() => handleSelectFromLibrary(item)}
-                  >
-                    <Text style={[styles.libChipText, form.name === item.name && styles.libChipTextActive]}>
-                      {item.name}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              />
+            <View style={styles.formGrid}>
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Séries</Text>
+                    <TextInput style={styles.input} value={form.sets} onChangeText={(t) => setForm({...form, sets: t})} keyboardType="numeric" />
+                </View>
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Repetições</Text>
+                    <TextInput style={styles.input} value={form.reps} onChangeText={(t) => setForm({...form, reps: t})} />
+                </View>
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Descanso (seg)</Text>
+                    <TextInput style={styles.input} value={form.rest_seconds} onChangeText={(t) => setForm({...form, rest_seconds: t})} keyboardType="numeric" />
+                </View>
             </View>
 
-            {form.name ? (
-              <Text style={{ color: "#00E676", marginBottom: 15, fontWeight: "bold" }}>
-                Selecionado: {form.name}
-              </Text>
-            ) : null}
-
-            <Text style={styles.label}>2. Defina o Volume:</Text>
-            <View style={styles.rowInputs}>
-              <TextInput
-                style={[styles.input, { flex: 1, marginRight: 10 }]}
-                placeholder="Séries (Ex: 4)"
-                placeholderTextColor="#888"
-                keyboardType="numeric"
-                value={form.sets}
-                onChangeText={(t) => setForm({ ...form, sets: t })}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Reps (Ex: 12)"
-                placeholderTextColor="#888"
-                keyboardType="numeric"
-                value={form.reps}
-                onChangeText={(t) => setForm({ ...form, reps: t })}
-              />
-            </View>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Descanso em segundos (Ex: 60)"
-              placeholderTextColor="#888"
-              keyboardType="numeric"
-              value={form.rest_seconds}
-              onChangeText={(t) => setForm({ ...form, rest_seconds: t })}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.confirmBtn, saving && { opacity: 0.7 }]} 
-                onPress={handleAddExercise}
-                disabled={saving || !form.name}
-              >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Salvar</Text>}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateExercise} disabled={saving}>
+               {saving ? <ActivityIndicator color="#111" /> : <Text style={styles.saveBtnText}>Salvar Alterações</Text>}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* MODAL GIGANTE PARA ADICIONAR NOVO EXERCÍCIO (PESQUISA NA BIBLIOTECA) */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedExercise ? "Configurar Exercício" : "Buscar na Biblioteca"}</Text>
+              <TouchableOpacity onPress={() => { setModalVisible(false); setSelectedExercise(null); }}>
+                <Feather name="x" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedExercise ? (
+              <View style={{ flex: 1 }}>
+                <View style={styles.selectedExerciseHeader}>
+                  <View style={styles.selectedGifBox}>
+                    <Image source={{ uri: getGifUrl(selectedExercise.media_url) }} style={styles.gif} resizeMode="cover" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 15 }}>
+                    <Text style={styles.selectedTitle}>{selectedExercise.name}</Text>
+                    <Text style={styles.selectedGroup}>{selectedExercise.muscle_group}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.formGrid}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Séries</Text>
+                    <TextInput style={styles.input} value={form.sets} onChangeText={(t) => setForm({...form, sets: t})} keyboardType="numeric" />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Repetições</Text>
+                    <TextInput style={styles.input} value={form.reps} onChangeText={(t) => setForm({...form, reps: t})} />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Descanso (seg)</Text>
+                    <TextInput style={styles.input} value={form.rest_seconds} onChangeText={(t) => setForm({...form, rest_seconds: t})} keyboardType="numeric" />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.saveBtn} onPress={handleAddExercise} disabled={saving}>
+                  {saving ? <ActivityIndicator color="#111" /> : <Text style={styles.saveBtnText}>Adicionar à Ficha</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.backSearchBtn} onPress={() => setSelectedExercise(null)}>
+                  <Text style={styles.backSearchText}>Voltar à pesquisa</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ flex: 1 }}>
+                <View style={styles.searchBar}>
+                  <Feather name="search" size={20} color="#666" style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Ex: Supino, Agachamento..."
+                    placeholderTextColor="#666"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    onSubmitEditing={handleSearch}
+                    returnKeyType="search"
+                  />
+                  <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                    <Text style={styles.searchBtnText}>Buscar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {searching ? (
+                  <ActivityIndicator color="#00E676" size="large" style={{ marginTop: 40 }} />
+                ) : (
+                  <FlatList
+                    data={libraryResults}
+                    keyExtractor={(item) => item.id.toString()}
+                    initialNumToRender={5}
+                    maxToRenderPerBatch={5}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    ListEmptyComponent={
+                      <Text style={styles.emptySearch}>
+                        {searchQuery.length > 0 ? "Nenhum exercício encontrado." : "Digite um nome para buscar."}
+                      </Text>
+                    }
+                    renderItem={({ item }) => (
+                      <TouchableOpacity style={styles.libraryItem} onPress={() => setSelectedExercise(item)}>
+                        <View style={styles.libraryGifBox}>
+                          <Image source={{ uri: getGifUrl(item.media_url) }} style={styles.gif} resizeMode="cover" />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 15 }}>
+                          <Text style={styles.libraryTitle}>{item.name}</Text>
+                          <Text style={styles.libraryGroup}>{item.muscle_group}</Text>
+                        </View>
+                        <Feather name="chevron-right" size={20} color="#555" />
+                      </TouchableOpacity>
+                    )}
+                  />
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 25, marginTop: 10 },
-  backButton: { marginRight: 15 },
-  headerTitle: { color: "#fff", fontSize: 26, fontWeight: "800" },
-  addButton: { backgroundColor: "#00E676", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
-  card: { padding: 12, marginBottom: 12 },
-  row: { flexDirection: "row", alignItems: "center" },
-  videoThumbnail: { width: 60, height: 60, borderRadius: 12, backgroundColor: "#000" },
-  indexCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255, 255, 255, 0.1)", justifyContent: "center", alignItems: "center" },
-  indexText: { color: "#fff", fontWeight: "bold" },
-  name: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  details: { color: "#aaa", fontSize: 13, marginTop: 4 },
-  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 60 },
-  empty: { color: "#888", textAlign: "center", fontSize: 16, fontWeight: "600" },
-  emptySub: { color: "#555", textAlign: "center", fontSize: 14, marginTop: 5 },
+  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "800" },
+  headerSub: { color: "#00E676", fontSize: 14, fontWeight: "600" },
+  addButton: { backgroundColor: "#00E676", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", shadowColor: "#00E676", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", padding: 20 },
-  modalContent: { backgroundColor: "#1A1A1A", borderRadius: 24, padding: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  modalTitle: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 20, textAlign: "center" },
-  label: { color: "#aaa", fontSize: 14, marginBottom: 10, fontWeight: "600" },
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { color: '#fff', marginTop: 15, fontSize: 18, fontWeight: '700' },
+  emptySub: { color: '#666', marginTop: 5, fontSize: 14 },
+
+  exerciseCard: { padding: 12, marginBottom: 10, borderRadius: 16 },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  gifContainer: { width: 55, height: 55, borderRadius: 10, backgroundColor: '#fff', overflow: 'hidden' },
+  gif: { width: '100%', height: '100%' },
+  cardInfo: { flex: 1, marginLeft: 15 },
+  cardTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  cardDetails: { color: '#666', fontSize: 13, marginTop: 3 },
+  deleteBtn: { padding: 8 },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "flex-end" },
+  modalContent: { backgroundColor: "#161616", height: "85%", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+
+  editExName: { color: '#00E676', fontSize: 16, fontWeight: '700', marginBottom: 20 },
+
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#222', borderRadius: 16, paddingHorizontal: 15, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  searchInput: { flex: 1, color: '#fff', paddingVertical: 15, fontSize: 15 },
+  searchBtn: { backgroundColor: 'rgba(0, 230, 118, 0.15)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10 },
+  searchBtnText: { color: '#00E676', fontWeight: '700', fontSize: 13 },
+  emptySearch: { color: '#666', textAlign: 'center', marginTop: 40, fontSize: 15 },
+
+  libraryItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  libraryGifBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#fff', overflow: 'hidden' },
+  libraryTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  libraryGroup: { color: '#888', fontSize: 12, marginTop: 2 },
+
+  selectedExerciseHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: 15, borderRadius: 16, marginBottom: 25 },
+  selectedGifBox: { width: 70, height: 70, borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden' },
+  selectedTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  selectedGroup: { color: '#00E676', fontSize: 13, fontWeight: '600', marginTop: 4 },
   
-  libChip: { backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginRight: 10, justifyContent: "center" },
-  libChipActive: { backgroundColor: "rgba(0, 230, 118, 0.2)", borderColor: "#00E676", borderWidth: 1 },
-  libChipText: { color: "#aaa", fontWeight: "600" },
-  libChipTextActive: { color: "#00E676", fontWeight: "bold" },
-
-  input: { backgroundColor: "rgba(255,255,255,0.08)", padding: 16, borderRadius: 14, color: "#fff", marginBottom: 12 },
-  rowInputs: { flexDirection: "row" },
-  modalButtons: { flexDirection: "row", gap: 12, marginTop: 10 },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)" },
-  cancelBtnText: { color: "#fff", fontWeight: "600" },
-  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: "center", backgroundColor: "#00E676" },
-  confirmBtnText: { color: "#111", fontWeight: "700" },
+  formGrid: { gap: 15, marginBottom: 30 },
+  inputGroup: {},
+  inputLabel: { color: '#888', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  input: { backgroundColor: '#222', borderRadius: 14, padding: 15, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  
+  saveBtn: { backgroundColor: '#00E676', padding: 18, borderRadius: 16, alignItems: 'center' },
+  saveBtnText: { color: '#111', fontSize: 16, fontWeight: '800' },
+  backSearchBtn: { padding: 15, alignItems: 'center', marginTop: 10 },
+  backSearchText: { color: '#888', fontSize: 14, fontWeight: '600' }
 });

@@ -37,15 +37,26 @@ export default function Home() {
 
     fetchAttendance();
   }, [user]);
-
-  const handleLogout = async () => {
+const handleLogout = async () => {
     const executeSignOut = async () => {
-      await supabase.auth.signOut();
-      router.replace("/auth/login");
+      try {
+        // 1. Apaga a memória do utilizador imediatamente (mesmo antes da internet responder)
+        useAuthStore.getState().setUser(null); 
+        
+        // 2. Tenta desligar do Supabase
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.log("Ignorando erro de logout:", error);
+      } finally {
+        // 3. O 'finally' garante que, com ou sem erro, ele é atirado para o login!
+        router.replace("/auth/login");
+      }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm("Tem certeza que deseja terminar a sessão?")) executeSignOut();
+      if (window.confirm("Tem certeza que deseja terminar a sessão?")) {
+        executeSignOut();
+      }
       return;
     }
 
